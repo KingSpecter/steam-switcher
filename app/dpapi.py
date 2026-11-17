@@ -4,8 +4,7 @@ Anything sensitive this app stores (Steam Guard shared secrets, and passwords
 only if the user explicitly opts in) is sealed with CryptProtectData under the
 current user's Windows credentials.  The ciphertext is useless on any other
 machine or under any other Windows account, so a leaked or synced vault file
-does not leak the secrets - which is exactly the failure mode of the plaintext
-batch file this app replaces.
+does not leak the secrets.
 """
 
 from __future__ import annotations
@@ -98,7 +97,7 @@ def decrypt(data: bytes, entropy: bytes = b"") -> bytes:
                     ctypes.byref(blob_entropy) if entropy else None,
                     None, None, CRYPTPROTECT_UI_FORBIDDEN, ctypes.byref(blob_out))
     if not ok:
-        raise DPAPIError("CryptUnprotectData failed - the vault was written by "
+        raise DPAPIError("CryptUnprotectData failed: the vault was written by "
                          "a different Windows user or on a different machine")
     try:
         return blob_out.value()

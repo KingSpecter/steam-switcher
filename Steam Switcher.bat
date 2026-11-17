@@ -1,13 +1,10 @@
 @echo off
-REM ===========================================================================
-REM  Steam Switcher - launcher
-REM  Starts the app with no console window. Double-click this file, or pin it
-REM  to the taskbar / Start menu.
-REM ===========================================================================
+REM ---- Steam Switcher launcher ----
+REM Starts the app without a console window.
 setlocal
 cd /d "%~dp0"
 
-REM pyw.exe is the Python launcher's windowed variant: no console flash.
+REM pyw is the windowed Python launcher, so no console flashes up
 where pyw >nul 2>&1 && (
     start "" pyw -3 -m app
     exit /b 0
@@ -18,7 +15,7 @@ where pythonw >nul 2>&1 && (
     exit /b 0
 )
 
-REM Fall back to a console-visible run so any startup error is readable.
+REM no windowed Python: run in a console so a startup error stays readable
 where py >nul 2>&1 && (
     py -3 -m app
     exit /b 0

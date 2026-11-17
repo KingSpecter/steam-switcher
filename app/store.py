@@ -52,9 +52,7 @@ def _write_json(path: str, data: Any) -> None:
     os.replace(temp, path)
 
 
-# --------------------------------------------------------------------------
-# Settings
-# --------------------------------------------------------------------------
+## ---- Settings ----
 def get_settings() -> dict[str, Any]:
     with _lock:
         stored = _read_json(paths.settings_file(), {})
@@ -72,9 +70,7 @@ def update_settings(changes: dict[str, Any]) -> dict[str, Any]:
         return settings
 
 
-# --------------------------------------------------------------------------
-# Per-account metadata (labels, colours, notes, ordering, usage counters)
-# --------------------------------------------------------------------------
+## ---- Per-account metadata (labels, colours, notes, ordering, usage counters) ----
 DEFAULT_META: dict[str, Any] = {
     "label": "", "color": "", "note": "", "favorite": False,
     "order": 9999, "switches": 0, "last_switch": 0, "hidden": False,
@@ -120,9 +116,7 @@ def reorder(order: list[str]) -> None:
             set_meta(steam64, {"order": index})
 
 
-# --------------------------------------------------------------------------
-# Switch history
-# --------------------------------------------------------------------------
+## ---- Switch history ----
 MAX_HISTORY = 200
 
 
@@ -161,11 +155,8 @@ def stats() -> dict[str, Any]:
     }
 
 
-# --------------------------------------------------------------------------
-# Vault - DPAPI-sealed secrets
-# --------------------------------------------------------------------------
-# Mixed into the DPAPI entropy so a blob copied between accounts inside the
-# vault file will not decrypt: each secret is bound to its own account.
+## ---- Vault (DPAPI-sealed secrets) ----
+# mixed into the DPAPI entropy so a secret only decrypts for its own account
 _ENTROPY_PREFIX = b"SteamSwitcher-v2:"
 
 
@@ -210,7 +201,7 @@ def get_secret(steam64: str, kind: str) -> str:
 
 
 def has_secret(steam64: str, kind: str) -> bool:
-    """Presence check that never decrypts - safe to call for every card."""
+    """Presence check that never decrypts, so it is cheap to call for every account."""
     return bool(_read_vault().get(str(steam64), {}).get(kind))
 
 

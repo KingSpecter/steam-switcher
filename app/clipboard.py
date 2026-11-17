@@ -3,8 +3,8 @@
 Used for Steam Guard codes and, when the user opts into the vault, passwords.
 A password left on the clipboard is readable by every process on the machine
 and survives until something else overwrites it, so anything copied from the
-vault is wiped again after a short delay - but only if it is still ours, so we
-never clobber something the user copied in the meantime.
+vault is wiped after a short delay, and only if it is still ours, so something the
+user copied in the meantime is left alone.
 """
 
 from __future__ import annotations
@@ -82,7 +82,7 @@ def copy(text: str) -> bool:
             if not _user32.SetClipboardData(CF_UNICODETEXT, handle):
                 _kernel32.GlobalFree(handle)
                 return False
-            # On success the system owns the block - freeing it here would crash.
+            # on success the system owns the block; freeing it here would crash
             return True
         finally:
             _user32.CloseClipboard()
@@ -112,7 +112,7 @@ def read() -> str:
 
 
 def copy_temporarily(text: str, seconds: float = 45.0) -> bool:
-    """Copy, then clear after `seconds` - but only if the value is still ours."""
+    """Copy, then clear after `seconds` if the value is still ours."""
     global _wipe_timer
     if not copy(text):
         return False

@@ -80,12 +80,10 @@ class AppState:
 STATE = AppState()
 
 
-# ==========================================================================
-# API handlers
-# ==========================================================================
+## ---- API handlers ----
 @route("GET", "/api/state")
 def api_state(_body: dict, _query: dict) -> dict:
-    """One call that fills the whole dashboard - the UI polls only this."""
+    """Everything the main view needs, in one call. The UI polls only this."""
     settings = store.get_settings()
     payload: dict[str, Any] = {
         "version": __version__,
@@ -169,8 +167,7 @@ def api_switch(body: dict, _query: dict) -> dict:
         })
         if ok:
             store.record_switch(steam64)
-            # The password is only touched when Steam is actually going to ask
-            # for one, and it goes to the clipboard - never onto a command line.
+            # only when Steam will ask for it, and only to the clipboard
             if not account.get("has_token") and settings.get("auto_copy_password"):
                 password = store.get_secret(steam64, "password")
                 if password:
@@ -391,10 +388,10 @@ def api_open(body: dict, _query: dict) -> dict:
     if kind == "folder":
         if not os.path.isdir(target):
             raise ApiError("no such folder", 404)
-        os.startfile(target)  # noqa: S606 - a validated local directory
+        os.startfile(target)  # noqa: S606, checked to be a directory
     elif target.startswith(("https://steamcommunity.com/", "https://store.steampowered.com/",
                             "steam://")):
-        os.startfile(target)  # noqa: S606 - restricted to Steam URLs
+        os.startfile(target)  # noqa: S606, Steam URLs only
     else:
         raise ApiError("refusing to open that target")
     return {"ok": True}
@@ -406,25 +403,22 @@ def api_quit(_body: dict, _query: dict) -> dict:
     return {"ok": True}
 
 
-# ==========================================================================
-# HTTP plumbing
-# ==========================================================================
+## ---- HTTP plumbing ----
 class Handler(BaseHTTPRequestHandler):
     server_version = "SteamSwitcher"
     sys_version = ""
     protocol_version = "HTTP/1.1"
 
-    def log_message(self, *_args) -> None:  # keep the console clean
+    def log_message(self, *_args) -> None:
         pass
 
-    # -- helpers ----------------------------------------------------------
+    ## ---- Helpers ----
     def _send(self, status: int, body: bytes, content_type: str,
               extra: dict[str, str] | None = None) -> None:
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
-        # The UI is same-origin and fully inlined; this blocks anything else.
         self.send_header("X-Content-Type-Options", "nosniff")
         for key, value in (extra or {}).items():
             self.send_header(key, value)
@@ -438,9 +432,8 @@ class Handler(BaseHTTPRequestHandler):
     def _authorized(self, query: dict) -> bool:
         """Accept the token from a header, the query string, or the session cookie.
 
-        The cookie exists because the browser fetches /style.css, /app.js and
-        avatar images by itself - those requests carry no header we control, so
-        without it every subresource would 401 and the page would render bare.
+        The cookie covers what the browser fetches by itself (/style.css, /app.js,
+        avatars), which carries no header we control.
         """
         supplied = self.headers.get("X-Token") or (query.get("t") or [""])[0]
         if not supplied:
@@ -463,7 +456,7 @@ class Handler(BaseHTTPRequestHandler):
         except (ValueError, UnicodeDecodeError) as exc:
             raise ApiError(f"invalid JSON body: {exc}") from exc
 
-    # -- dispatch ---------------------------------------------------------
+    ## ---- Dispatch ----
     def do_GET(self) -> None:
         self._dispatch("GET")
 
@@ -478,8 +471,7 @@ class Handler(BaseHTTPRequestHandler):
         path = urllib.parse.unquote(parsed.path)
         query = urllib.parse.parse_qs(parsed.query)
 
-        # Reject cross-origin callers outright: a page on another site must not
-        # be able to drive this API even if it somehow learned the token.
+        # a page on another site must not drive this API, even with the token
         origin = self.headers.get("Origin")
         if origin and not origin.startswith("http://127.0.0.1:"):
             self._json(HTTPStatus.FORBIDDEN, {"error": "cross-origin request refused"})
@@ -547,9 +539,7 @@ class Handler(BaseHTTPRequestHandler):
         extra: dict[str, str] = {}
         if name == "index.html":
             body = body.replace(b"__SESSION_TOKEN__", STATE.token.encode("ascii"))
-            # Hands the token to the browser so it can fetch the stylesheet,
-            # script and avatars. SameSite=Strict keeps any other origin from
-            # riding along, and the server only listens on loopback.
+            # SameSite=Strict keeps other origins from sending it; loopback only
             extra["Set-Cookie"] = (f"{COOKIE_NAME}={STATE.token}; Path=/; "
                                    "SameSite=Strict; HttpOnly")
 

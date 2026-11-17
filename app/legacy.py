@@ -1,9 +1,9 @@
 """Importer for the old Steam.bat account list.
 
-Reads the `SET acc_username[N]=` / `SET acc_password[N]=` pairs out of the
-legacy batch file so the switch list carries over. Passwords are reported but
-never stored unless the user explicitly opts in, and every imported password is
-flagged: a password kept in plain text should be rotated rather than reused.
+Reads the `SET acc_username[N]=` / `SET acc_password[N]=` pairs out of an old
+batch switcher so its account list carries over. Passwords are reported but never
+stored unless the user opts in, and they are flagged: a password kept in plain
+text should be changed rather than reused.
 """
 
 from __future__ import annotations
@@ -52,8 +52,7 @@ def parse(path: str) -> dict[str, Any]:
     for line in lines:
         match = _USERNAME.match(line)
         if match:
-            # Later duplicate slots overwrite earlier ones, matching how batch
-            # itself evaluates repeated SET statements.
+            # a repeated slot overwrites the earlier one, as cmd.exe does
             usernames[int(match.group(1))] = match.group(2)
             continue
         match = _PASSWORD.match(line)
@@ -71,8 +70,7 @@ def parse(path: str) -> dict[str, Any]:
             "username": username,
             "password": password,
             "has_password": bool(password) and password.lower() not in _PLACEHOLDERS,
-            # `& | > < ^ %` end or redirect a SET in cmd.exe, so any password
-            # containing them was never actually stored correctly by the old script.
+            # `& | > < ^ %` break a SET in cmd.exe, so such a password never worked there
             "password_was_broken": bool(re.search(r"[&|<>^%]", password)),
         })
 

@@ -35,15 +35,13 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         if proc is not None:
-            # The window owns the app's lifetime: closing it exits the app.
-            # Polling rather than proc.wait() lets /api/quit end things too.
+            # closing the window exits the app; polling lets /api/quit end it too
             while proc.poll() is None and not server.STATE.should_quit.is_set():
                 time.sleep(0.3)
             if server.STATE.should_quit.is_set() and proc.poll() is None:
                 proc.terminate()
         else:
-            # We fell back to the default browser, so there is no process to
-            # watch; stay up until the UI asks us to quit.
+            # default browser: no process to watch, wait for /api/quit
             while not server.STATE.should_quit.is_set():
                 time.sleep(0.3)
     except KeyboardInterrupt:

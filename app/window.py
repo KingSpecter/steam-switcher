@@ -2,8 +2,8 @@
 
 Every Windows 10/11 machine already ships Edge with the Chromium engine, and
 `--app=` gives a real borderless window with no tabs, address bar or browser
-menus. That buys a native-looking desktop window without bundling a UI toolkit:
-no PySide (~100 MB), no Electron, no pip install at all.
+menus. That gives a desktop window without bundling a UI toolkit or installing
+anything.
 
 A private --user-data-dir keeps this out of the user's own browser profile, and
 makes the launched process the window's owner so we can exit when it closes.
@@ -79,10 +79,7 @@ def open_window(url: str) -> subprocess.Popen | None:
         "--disable-sync",
         "--disable-extensions",
         "--disable-component-update",
-        # Everything below trims the private profile directory. Left at their
-        # defaults, Edge fills it with ~22 MB of HTTP cache, GPU shader caches,
-        # telemetry and shopping-assistant data - all of it pointless for a
-        # page served from loopback.
+        # keep the private profile small: no caches or extras for a loopback page
         "--disk-cache-size=1",
         "--media-cache-size=1",
         "--disable-gpu-shader-disk-cache",

@@ -5,8 +5,8 @@ truncated integer is rendered in base-26 over Valve's own alphabet instead of
 as decimal digits.  Feeding it a shared_secret (the one inside a Steam Desktop
 Authenticator .maFile) reproduces the same 5-character code the phone app shows.
 
-This is optional - the token-based switch never triggers a Guard prompt.  It
-exists for the first login on a new account, where Steam does ask.
+Optional: the token-based switch never triggers a Guard prompt. It helps with the
+first sign-in on a new account, where Steam does ask.
 """
 
 from __future__ import annotations
@@ -27,9 +27,8 @@ _CODE_LENGTH = 5
 STEP_SECONDS = 30
 
 
-# A Steam shared_secret is the 20-byte key for HMAC-SHA1. Requiring a sensible
-# minimum rejects pasted junk that merely happens to be decodable - "zzzz" is
-# valid base64 for three bytes and would otherwise produce plausible codes.
+# A shared_secret is the 20-byte HMAC-SHA1 key. A minimum length rejects pasted junk
+# that happens to decode ("zzzz" is valid base64 for three bytes).
 _MIN_KEY_BYTES = 16
 
 
@@ -39,10 +38,8 @@ def _decode_secret(shared_secret: str) -> bytes:
     if not secret:
         raise ValueError("shared secret is empty")
 
-    # Hex must be tried first. A 40-character hex string is also syntactically
-    # valid base64, so testing base64 first would silently decode it to the
-    # wrong 30 bytes. Real base64 secrets are 28 chars ending in '=', which is
-    # not a hex digit, so this check can never steal one.
+    # hex first: 40 hex characters are also valid base64 and would decode to the wrong
+    # bytes. Real base64 secrets end in '=', which is not a hex digit.
     if len(secret) % 2 == 0 and all(c in "0123456789abcdefABCDEF" for c in secret):
         raw = bytes.fromhex(secret)
         if len(raw) >= _MIN_KEY_BYTES:
@@ -77,7 +74,7 @@ def generate_code(shared_secret: str, timestamp: float | None = None) -> str:
 
 
 def seconds_remaining(timestamp: float | None = None) -> int:
-    """Seconds until the current code rolls over - drives the countdown ring."""
+    """Seconds until the current code rolls over (drives the countdown ring)."""
     now = timestamp if timestamp is not None else time.time()
     return STEP_SECONDS - int(now) % STEP_SECONDS
 

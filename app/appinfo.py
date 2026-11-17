@@ -15,7 +15,7 @@ Layout
     i64   string-table offset          (v29 only)
     per app, until appid == 0:
         u32 appid
-        u32 size          bytes remaining in this entry -> lets us skip ahead
+        u32 size          bytes left in this entry, used to skip ahead
         u32 infoState, u32 lastUpdated, u64 picsToken
         b20 sha1(text), u32 changeNumber
         b20 sha1(binary)                (v28+)
@@ -130,8 +130,7 @@ def _find_name(reader: _Reader, limit: int, table: list[str] | None) -> str:
             stack.append(key)
         elif tag == _TYPE_STRING:
             value = reader.cstring()
-            # "name" also appears under config/, extended/ and so on; only the
-            # one directly inside common/ is the store title.
+            # only the "name" directly inside common/ is the store title
             if key == "name" and stack[-1:] == ["common"]:
                 return value
         elif tag == _TYPE_WSTRING:
@@ -186,16 +185,14 @@ def parse_appinfo(path: str, max_apps: int = 400_000) -> dict[str, str]:
         if name:
             names[str(appid)] = name
 
-        # Always resync from the header size: a malformed blob cannot
-        # desynchronise the outer loop.
+        # resync from the header size so a bad blob cannot derail the loop
         reader.pos = entry_end
     return names
 
 
-# --------------------------------------------------------------------------
-# Cached access. The 1.6 MB cache takes a moment to parse, so the result is
-# memoised in memory and mirrored to disk, keyed on the file's mtime and size.
-# --------------------------------------------------------------------------
+## ---- Cached access ----
+# parsing takes a moment, so the result is kept in memory and on disk,
+# keyed on the file's mtime and size
 _memory: tuple[str, dict[str, str]] | None = None
 
 

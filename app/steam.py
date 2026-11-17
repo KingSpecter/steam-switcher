@@ -12,10 +12,9 @@ which account is next:
     3. flip MostRecent/AutoLogin in config/loginusers.vdf to the target
     4. start Steam
 
-That is the whole mechanism, and it never touches a password.  The legacy
-approach - passing `-login <user> <pass>` on the command line - leaks the
-password to every process on the machine via the process table, and current
-Steam clients ignore the password argument anyway.
+No password is involved. Passing `-login <user> <pass>` instead would put the
+password in the process table, where any program can read it, and current
+Steam clients ignore that password argument anyway.
 """
 
 from __future__ import annotations
@@ -46,8 +45,7 @@ REG_ACTIVE = r"Software\Valve\Steam\ActiveProcess"
 
 STEAM_PROCESSES = ("steam.exe", "steamwebhelper.exe", "steamservice.exe", "GameOverlayUI.exe")
 
-# StateFlags bits from Valve's EAppState. We only care about "something is
-# mid-download", because killing Steam during one corrupts the partial chunk.
+# StateFlags bits from Valve's EAppState; only "mid-download" matters here
 _STATE_UPDATE_REQUIRED = 2
 _STATE_UPDATE_RUNNING = 256
 _STATE_UPDATE_PAUSED = 512
@@ -64,11 +62,9 @@ class SteamNotFound(RuntimeError):
     """Raised when Steam cannot be located on this machine."""
 
 
-# --------------------------------------------------------------------------
-# Small mtime-keyed cache. Steam's localconfig.vdf runs to ~80 KB per account
-# and the UI refreshes every couple of seconds, so reparsing every poll is
-# wasteful; keying on mtime means edits by Steam are still picked up at once.
-# --------------------------------------------------------------------------
+## ---- Parsed-file cache ----
+# keyed on mtime: localconfig.vdf is ~80 KB per account and the UI polls every
+# couple of seconds; edits by Steam change the mtime and are picked up at once
 _cache: dict[str, tuple[float, Any]] = {}
 _cache_lock = threading.Lock()
 
@@ -96,9 +92,7 @@ def clear_cache() -> None:
         _cache.clear()
 
 
-# --------------------------------------------------------------------------
-# Registry helpers
-# --------------------------------------------------------------------------
+## ---- Registry helpers ----
 def _reg_read(subkey: str, name: str, hive=None) -> Any:
     if winreg is None:
         return None
@@ -121,9 +115,7 @@ def _reg_write(subkey: str, name: str, value: Any, kind: int) -> bool:
         return False
 
 
-# --------------------------------------------------------------------------
-# Discovery
-# --------------------------------------------------------------------------
+## ---- Discovery ----
 def discover(override: str | None = None) -> dict[str, str]:
     """Locate the Steam install. Registry first, then the usual install paths."""
     candidates: list[str] = []
@@ -187,9 +179,7 @@ def _machine_authorized(root: str) -> bool:
     return bool(glob.glob(os.path.join(root, "ssfn*")))
 
 
-# --------------------------------------------------------------------------
-# Accounts
-# --------------------------------------------------------------------------
+## ---- Accounts ----
 def read_accounts(paths: dict[str, str] | None = None) -> list[dict[str, Any]]:
     """Every account Steam knows about, enriched with everything we can learn offline."""
     paths = paths or discover()
@@ -210,8 +200,7 @@ def read_accounts(paths: dict[str, str] | None = None) -> list[dict[str, Any]]:
         account_id = steamid.to_account_id(sid64)
         account_name = str(info.get("AccountName", ""))
         avatar = os.path.join(paths["avatars"], f"{sid64}.png")
-        # RememberPassword is Steam's own record of "I hold a refresh token for
-        # this account", which is exactly the condition for a passwordless switch.
+        # RememberPassword means Steam holds a refresh token: the switch needs no password
         has_token = str(info.get("RememberPassword", "0")) == "1"
 
         timestamp = 0
@@ -242,15 +231,13 @@ def read_accounts(paths: dict[str, str] | None = None) -> list[dict[str, Any]]:
     return accounts
 
 
-# --------------------------------------------------------------------------
-# Games
-# --------------------------------------------------------------------------
+## ---- Games ----
 def library_folders(paths: dict[str, str] | None = None) -> list[str]:
     """Every Steam library on this machine, including secondary drives."""
     paths = paths or discover()
     found = [paths["root"]]
-    # The registry reports the root lowercased while libraryfolders.vdf uses
-    # display casing, so the same folder arrives twice unless we fold case.
+    # the registry gives the root in lower case and libraryfolders.vdf does not,
+    # so compare case-insensitively or the same folder shows up twice
     seen = {paths["root"].lower()}
     data = _cached_vdf(os.path.join(paths["config_dir"], "libraryfolders.vdf"))
     for value in (data.get("libraryfolders") or data.get("LibraryFolders") or {}).values():
@@ -339,8 +326,7 @@ def account_games(account_id: int | str, paths: dict[str, str] | None = None,
     paths = paths or discover()
     playtime = account_playtime(account_id, paths)
     installed = installed_apps(paths)
-    # Names for games that are owned but not installed; an appmanifest only
-    # exists for installed titles, so without this most rows read "App 271590".
+    # names for owned games that are not installed (no appmanifest for those)
     names = appinfo.load_names(paths["root"])
     sid64 = str(steamid.to_steam64(account_id))
 
@@ -380,16 +366,9 @@ def account_games(account_id: int | str, paths: dict[str, str] | None = None,
     }
 
 
-# --------------------------------------------------------------------------
-# Pre-flight safety
-# --------------------------------------------------------------------------
+## ---- Pre-flight safety ----
 def preflight(paths: dict[str, str] | None = None) -> list[dict[str, str]]:
-    """Warn about anything a restart would interrupt.
-
-    The batch script this replaces ran `taskkill /f` unconditionally, which
-    silently aborted downloads and skipped Steam Cloud sync. Surfacing these
-    before the switch is the whole point.
-    """
+    """Warn about anything a restart would interrupt (a running game, a download)."""
     paths = paths or discover()
     state = registry_state()
     checks: list[dict[str, str]] = []
@@ -402,8 +381,7 @@ def preflight(paths: dict[str, str] | None = None) -> list[dict[str, str]]:
     if state["running_app_id"]:
         appid = str(state["running_app_id"])
         app = apps.get(appid)
-        # Not LastGameNameUsed - Steam sometimes leaves the *persona* name in
-        # that value, which would name the wrong thing in a safety warning.
+        # not LastGameNameUsed: Steam sometimes leaves the persona name in it
         name = (app["name"] if app else "") or appinfo.resolve(appid, paths["root"])
         checks.append({
             "level": "danger",
@@ -475,7 +453,8 @@ def health_report(paths: dict[str, str] | None = None) -> list[dict[str, Any]]:
         names = ", ".join(a["persona_name"] for a in tokenless[:4])
         issues.append({
             "level": "warn", "code": "no_token",
-            "title": f"{len(tokenless)} account(s) need one manual sign-in: {names}",
+            "title": (f"{len(tokenless)} account{'s' if len(tokenless) != 1 else ''} "
+                      f"need{'s' if len(tokenless) == 1 else ''} one manual sign-in: {names}"),
             "detail": "Switch to each one and sign in with \"Remember me\" ticked. After "
                       "that they switch instantly with no password and no Guard code.",
             "fixable": False,
@@ -531,9 +510,7 @@ def apply_fix(code: str, paths: dict[str, str] | None = None) -> dict[str, Any]:
     return {"ok": False, "message": f"No automatic fix for '{code}'."}
 
 
-# --------------------------------------------------------------------------
-# Backups
-# --------------------------------------------------------------------------
+## ---- Backups ----
 def _backup_dir() -> str:
     from .paths import backups_dir
     return backups_dir()
@@ -597,7 +574,7 @@ def restore_backup(name: str, paths: dict[str, str] | None = None) -> dict[str, 
     if not os.path.isdir(source):
         return {"ok": False, "message": "That backup no longer exists."}
     if winproc.is_running("steam.exe"):
-        return {"ok": False, "message": "Close Steam first - it rewrites these files on exit."}
+        return {"ok": False, "message": "Close Steam first. It rewrites these files when it exits."}
 
     vdf_backup = os.path.join(source, "loginusers.vdf")
     if os.path.isfile(vdf_backup):
@@ -615,9 +592,7 @@ def restore_backup(name: str, paths: dict[str, str] | None = None) -> dict[str, 
     return {"ok": True, "message": f"Restored {name}."}
 
 
-# --------------------------------------------------------------------------
-# Writing Steam's state
-# --------------------------------------------------------------------------
+## ---- Writing Steam's state ----
 def _atomic_write_vdf(path: str, data: dict) -> None:
     """Write via a temp file in the same directory, then rename.
 
@@ -652,13 +627,11 @@ def _set_active_in_vdf(paths: dict[str, str], target_sid64: str) -> bool:
             continue
         is_target = str(sid64) == str(target_sid64)
         found = found or is_target
-        # Steam has used both key names across client versions; write both so
-        # the switch works regardless of which one this client reads.
+        # different client versions read different keys, so both are written
         info["MostRecent"] = "1" if is_target else "0"
         info["AutoLogin"] = "1" if is_target else "0"
         if is_target:
-            # Ask Steam to persist a refresh token, so the *next* switch to this
-            # account needs no password even if this one does.
+            # ask Steam to keep a token so the next switch needs no password
             info["RememberPassword"] = "1"
             info["WantsOfflineMode"] = "0"
     if not found:
@@ -670,11 +643,7 @@ def _set_active_in_vdf(paths: dict[str, str], target_sid64: str) -> bool:
 
 
 def shutdown_steam(timeout: float = 25.0, on_step: Callable[[str], None] | None = None) -> dict[str, Any]:
-    """Ask Steam to exit cleanly; force it only if it refuses.
-
-    `steam.exe -shutdown` lets Steam flush its config, finish Steam Cloud sync
-    and close downloads at a chunk boundary. Force-killing skips all of that.
-    """
+    """Ask Steam to exit with `-shutdown` (config saved, cloud synced); force it only if it refuses."""
     def step(message: str) -> None:
         if on_step:
             on_step(message)
@@ -698,15 +667,13 @@ def shutdown_steam(timeout: float = 25.0, on_step: Callable[[str], None] | None 
         winproc.wait_for_exit("steamwebhelper.exe", timeout=6)
         return {"ok": True, "forced": False, "was_running": True}
 
-    step("Steam did not respond - forcing it to close")
+    step("Steam did not respond, forcing it to close")
     winproc.kill(*STEAM_PROCESSES)
     forced_ok = winproc.wait_for_exit("steam.exe", timeout=8)
     return {"ok": forced_ok, "forced": True, "was_running": True}
 
 
-# --------------------------------------------------------------------------
-# The switch, as a cancellable background job with live progress
-# --------------------------------------------------------------------------
+## ---- The switch, run on a worker thread with live progress ----
 class SwitchJob:
     """Runs a switch on a worker thread and publishes progress for the UI to poll."""
 
@@ -770,8 +737,7 @@ class SwitchJob:
             if result["forced"]:
                 self._step("Steam was force-closed; cloud sync may be incomplete", "warn")
 
-            # Both writes must land while Steam is stopped - it rewrites these
-            # on exit and reads them on launch.
+            # both writes must land while Steam is stopped: it rewrites these on exit
             account_name = account["account_name"]
             if not _reg_write(REG_STEAM, "AutoLoginUser", account_name.lower(), winreg.REG_SZ):
                 raise RuntimeError("Could not write AutoLoginUser to the registry.")
@@ -789,8 +755,7 @@ class SwitchJob:
             if self.big_picture:
                 argv.append("-bigpicture")
             if not account["has_token"]:
-                # Username only. Never the password - that would put the secret
-                # in the process table for every process on the machine to read.
+                # username only; a password here would be readable in the process table
                 argv += ["-login", account_name]
             if self.app_id:
                 argv += ["-applaunch", str(self.app_id)]
@@ -799,7 +764,7 @@ class SwitchJob:
             self._step("Starting Steam" + (f" and launching app {self.app_id}" if self.app_id else ""))
 
             if account["has_token"]:
-                self._step(f"Signed in as {account['persona_name']} - no password needed")
+                self._step(f"Signing in as {account['persona_name']}, no password needed")
             else:
                 self._step("Steam will ask for this account's password once. Tick "
                            "\"Remember me\" and future switches are instant.", "warn")
