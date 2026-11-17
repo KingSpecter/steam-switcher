@@ -1,14 +1,11 @@
-/* ==========================================================================
-   Steam Switcher — UI logic
-   No framework. The whole app is one polled state object plus render passes.
-   ========================================================================== */
+// Steam Switcher UI. No framework: one polled state object and a few render passes.
 "use strict";
 
-const TOKEN = window.__TOKEN__;
+const TOKEN = document.querySelector('meta[name="ss-token"]').content;
 const $  = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
-/* ── api ──────────────────────────────────────────────────────────────── */
+// ---- API ----
 async function api(path, body) {
   const res = await fetch(path, {
     method: body === undefined ? "GET" : "POST",
@@ -20,22 +17,21 @@ async function api(path, body) {
   return data;
 }
 
-/* ── helpers ──────────────────────────────────────────────────────────── */
+// ---- Helpers ----
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 const icon = (name) => `<svg><use href="#i-${name}"/></svg>`;
+const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
 
 function relTime(unix) {
   if (!unix) return "never";
   const secs = Date.now() / 1000 - unix;
-  if (secs < 0) return "just now";
-  const steps = [[60, "s"], [3600, "m"], [86400, "h"], [604800, "d"], [2629800, "w"], [31557600, "mo"]];
   if (secs < 60) return "just now";
-  for (let i = 1; i < steps.length; i++) {
-    if (secs < steps[i][0]) return `${Math.floor(secs / steps[i - 1][0])}${steps[i - 1][1]} ago`;
-  }
-  return `${Math.floor(secs / 31557600)}y ago`;
+  const steps = [[60, "m"], [3600, "h"], [86400, "d"], [604800, "w"], [2629800, "mo"], [31557600, "y"]];
+  let unit = steps[0];
+  for (const step of steps) if (secs >= step[0]) unit = step;
+  return `${Math.floor(secs / unit[0])}${unit[1]} ago`;
 }
 
 function hours(minutes) {
@@ -45,7 +41,7 @@ function hours(minutes) {
   return h < 100 ? `${h.toFixed(1)}h` : `${Math.round(h).toLocaleString()}h`;
 }
 
-/* Stable hue per account so the generated avatar never changes between runs. */
+// stable hue per account, so the fallback avatar is the same every run
 function hueOf(id) {
   let hash = 0;
   for (const ch of String(id)) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
@@ -56,17 +52,24 @@ const initials = (name) => String(name || "?").trim().split(/\s+/).slice(0, 2)
   .map((w) => w[0]).join("").toUpperCase() || "?";
 
 function avatarHtml(acc, cls = "av") {
-  const style = `--h:${hueOf(acc.steam64)}`;
   return acc.has_avatar
-    ? `<div class="${cls}" style="${style}"><img src="/avatar/${acc.steam64}.png?t=${TOKEN}" alt=""></div>`
-    : `<div class="${cls}" style="${style}">${esc(initials(acc.persona_name))}</div>`;
+    ? `<div class="${cls}" data-hue="${hueOf(acc.steam64)}"><img src="/avatar/${acc.steam64}.png?t=${TOKEN}" alt=""></div>`
+    : `<div class="${cls}" data-hue="${hueOf(acc.steam64)}">${esc(initials(acc.persona_name))}</div>`;
+}
+
+// the page runs under a CSP without inline styles, so colours are set here
+function paint(root = document) {
+  $$("[data-hue]", root).forEach((el) => el.style.setProperty("--h", el.dataset.hue));
+  $$("[data-tint]", root).forEach((el) => {
+    if (/^#[0-9a-f]{3,8}$/i.test(el.dataset.tint)) el.style.setProperty("--tint", el.dataset.tint);
+  });
 }
 
 function toast(message, kind = "ok") {
-  const name = kind === "err" ? "alert" : kind === "warn" ? "alert" : "check";
+  const lamp = kind === "err" ? "bad" : kind === "warn" ? "warn" : "on";
   const el = document.createElement("div");
   el.className = `toast ${kind}`;
-  el.innerHTML = `${icon(name)}<span>${esc(message)}</span>`;
+  el.innerHTML = `<span class="lamp ${lamp}"></span><span>${esc(message)}</span>`;
   $("#toasts").append(el);
   setTimeout(() => {
     el.classList.add("out");
@@ -74,7 +77,7 @@ function toast(message, kind = "ok") {
   }, kind === "err" ? 6000 : 3200);
 }
 
-/* ── state ────────────────────────────────────────────────────────────── */
+// ---- State ----
 const S = {
   data: null,
   filter: "",
@@ -83,7 +86,7 @@ const S = {
   switching: false,
   guardTimer: null,
   pollTimer: null,
-  games: {},          // steam64 -> rendered library HTML, so reopening is instant
+  games: {},          // steam64 -> library html, so reopening the drawer is instant
 };
 
 const visibleAccounts = () => {
@@ -97,14 +100,13 @@ const visibleAccounts = () => {
 
 const accountById = (id) => S.data?.accounts.find((a) => a.steam64 === id) || null;
 
-/* ── refresh loop ─────────────────────────────────────────────────────── */
+// ---- Refresh loop ----
 async function refresh() {
   try {
     S.data = await api("/api/state");
     renderAll();
   } catch (err) {
-    $("#now-name").textContent = "Connection lost";
-    $("#now-sub").textContent = err.message;
+    setReadout("", "Error", "Connection lost", err.message);
   }
 }
 
@@ -113,7 +115,7 @@ function startPolling() {
   S.pollTimer = setInterval(() => { if (!S.switching) refresh(); }, 2500);
 }
 
-/* ── render: shell ────────────────────────────────────────────────────── */
+// ---- Render: shell ----
 function renderAll() {
   const d = S.data;
   if (!d) return;
@@ -127,10 +129,8 @@ function renderAll() {
   renderBanners();
   renderGrid();
   renderSettings();
-  // The drawer is deliberately NOT re-rendered here. It holds live text the
-  // user may be typing (label, note, a password) plus the loaded game list and
-  // the ticking Guard code; rebuilding it every poll would drop the caret and
-  // wipe all of it. It re-renders only when opened or after an explicit edit.
+  // The drawer is not rebuilt on every poll: it holds text being typed, the
+  // loaded game list and the ticking Guard code. It renders on open and after edits.
 }
 
 function applyTheme(theme) {
@@ -140,117 +140,116 @@ function applyTheme(theme) {
   document.documentElement.dataset.theme = dark ? "dark" : "light";
 }
 
+function setReadout(lamp, tag, name, sub) {
+  $("#now-dot").className = `lamp ${lamp}`;
+  $("#now-tag").textContent = tag;
+  $("#now-name").textContent = name;
+  $("#now-sub").textContent = sub;
+}
+
 function renderStatus() {
   const { steam, accounts } = S.data;
-  const dot = $("#now-dot");
-  dot.className = "now-dot";
 
   if (!S.data.steam_found) {
-    $("#now-name").textContent = "Steam not found";
-    $("#now-sub").textContent = S.data.steam_error;
-    return;
+    return setReadout("", "Status", "Steam not found", S.data.steam_error);
   }
   if (!steam.running) {
-    $("#now-name").textContent = "Steam is not running";
-    $("#now-sub").textContent = `${accounts.length} account${accounts.length === 1 ? "" : "s"} ready`;
-    return;
+    return setReadout("", "Steam off", "Not running", `${plural(accounts.length, "account")} ready`);
   }
 
   const active = accounts.find((a) => a.is_active);
-  dot.classList.add(steam.running_app_id ? "busy" : "on");
-  $("#now-name").textContent = active ? active.persona_name : "Signed out";
-  $("#now-sub").textContent = active
-    ? (steam.running_app_id ? `in-game · ${active.account_name}` : `signed in · ${active.account_name}`)
-    : "Steam is on the login screen";
+  if (!active) return setReadout("", "Steam on", "Signed out", "Steam is on the login screen");
+  if (steam.running_app_id) {
+    return setReadout("busy", "In game", active.persona_name, `${active.account_name} · app ${steam.running_app_id}`);
+  }
+  setReadout("on", "Signed in", active.persona_name, active.account_name);
 }
 
-/* ── render: banners ──────────────────────────────────────────────────── */
+// ---- Render: banners ----
 function renderBanners() {
   const host = $("#banners");
   host.innerHTML = "";
 
   if (!S.data.steam_found) {
-    host.insertAdjacentHTML("beforeend", banner("danger", "alert", "Steam could not be found",
-      esc(S.data.steam_error), `<button class="btn btn-sm" data-go="settings">Set the folder</button>`));
+    host.insertAdjacentHTML("beforeend", banner("danger", "Steam could not be found",
+      esc(S.data.steam_error), `<button class="key key-sm" data-go="settings">Set the folder</button>`));
     return;
   }
 
   for (const check of S.data.preflight) {
-    host.insertAdjacentHTML("beforeend",
-      banner(check.level, "alert", esc(check.title), esc(check.detail)));
+    host.insertAdjacentHTML("beforeend", banner(check.level, esc(check.title), esc(check.detail)));
   }
 }
 
-function banner(level, ic, title, body, actions = "") {
-  return `<div class="banner is-${level}">${icon(ic)}
+function banner(level, title, body, actions = "") {
+  return `<div class="banner is-${level}">${icon("alert")}
     <div class="banner-body"><b>${title}</b><span>${body}</span></div>
     ${actions ? `<div class="banner-actions">${actions}</div>` : ""}</div>`;
 }
 
-/* ── render: account grid ─────────────────────────────────────────────── */
+// ---- Render: account list ----
+function signInState(acc) {
+  if (acc.is_active) return `<div class="state on"><span class="lamp on"></span>Signed in</div>`;
+  // what the next switch to this account costs
+  return acc.has_token
+    ? `<div class="state" title="Steam has a saved token, no password needed"><span class="lamp ready"></span>Instant</div>`
+    : `<div class="state" title="No saved token yet, Steam will ask for the password once"><span class="lamp warn"></span>Needs password</div>`;
+}
+
 function renderGrid() {
   const grid = $("#grid");
   const list = visibleAccounts();
   $("#empty").hidden = list.length > 0 || !S.data.steam_found;
+  $(".rack-head").hidden = list.length === 0;
 
   grid.innerHTML = list.map((acc, i) => {
     const m = acc.meta;
-    const tint = m.color ? `--tint:${esc(m.color)}` : "";
-    const pills = [];
-    if (acc.is_active) pills.push(`<span class="pill pill-live">${icon("check")}Signed in</span>`);
-    // Describes what the *next* switch to this account will cost, which is why
-    // it still shows on the account that happens to be signed in right now.
-    pills.push(acc.has_token
-      ? `<span class="pill pill-ok" title="Steam holds a refresh token — switching signs in with no password">Instant</span>`
-      : `<span class="pill pill-warn" title="No stored token yet — Steam will ask for this password once">Needs password</span>`);
-    if (m.label) pills.push(`<span class="pill pill-label" style="${tint}">${esc(m.label)}</span>`);
-    if (acc.vault.shared_secret) pills.push(`<span class="pill">${icon("shield")}2FA</span>`);
+    const tags = [];
+    if (m.label) tags.push(`<span class="tag" data-tint="${esc(m.color)}">${esc(m.label)}</span>`);
+    if (acc.vault.shared_secret) tags.push(`<span class="tag tag-plain">2FA</span>`);
 
     return `
-    <article class="card ${acc.is_active ? "is-active" : ""}" data-id="${acc.steam64}" draggable="true"
-             style="${tint};animation-delay:${Math.min(i * 26, 260)}ms">
-      ${i < 9 ? `<span class="kbd-hint">${i + 1}</span>` : ""}
-      <div class="card-top">
+    <article class="row ${acc.is_active ? "is-active" : ""} ${m.color ? "has-tint" : ""}" data-id="${acc.steam64}"
+             data-tint="${esc(m.color)}" draggable="true">
+      <span class="ch ${i < 9 ? "" : "none"}" title="${i < 9 ? `Press ${i + 1} to switch` : ""}">${i < 9 ? String(i + 1).padStart(2, "0") : "--"}</span>
+      <div class="who">
         ${avatarHtml(acc)}
-        <div class="card-id">
-          <b>${esc(acc.persona_name)}</b>
-          <span>${esc(acc.account_name)}</span>
+        <div class="who-text">
+          <div class="who-line"><b>${esc(acc.persona_name)}</b>${tags.join("")}</div>
+          <span class="acct">${esc(acc.account_name)}</span>
+          ${m.note ? `<p class="row-note">${esc(m.note)}</p>` : ""}
         </div>
-        <button class="card-star ${m.favorite ? "on" : ""}" data-star="${acc.steam64}"
-                title="${m.favorite ? "Remove from favourites" : "Add to favourites"}"
-                aria-label="Toggle favourite">${icon("star")}</button>
       </div>
-
-      <div class="pills">${pills.join("")}</div>
-
-      <div class="card-meta">
-        <span>Last used <b>${relTime(acc.last_login)}</b></span>
-        ${m.switches ? `<span>·</span><span><b>${m.switches}</b> switch${m.switches === 1 ? "" : "es"}</span>` : ""}
-      </div>
-
-      ${m.note ? `<div class="card-note" style="${tint}">${esc(m.note)}</div>` : ""}
-
-      <div class="card-actions">
-        <button class="btn" data-switch="${acc.steam64}" ${acc.is_active ? "disabled" : ""}>
-          ${acc.is_active ? "Current account" : "Switch"}
+      ${signInState(acc)}
+      <div class="used">${relTime(acc.last_login)}${m.switches ? `<small>${plural(m.switches, "switch", "switches")}</small>` : ""}</div>
+      <div class="row-actions">
+        <button class="star ${m.favorite ? "on" : ""}" data-star="${acc.steam64}"
+                title="${m.favorite ? "Unpin from the top" : "Pin to the top"}" aria-label="Pin to the top">${icon("star")}</button>
+        <button class="key key-icon" data-open="${acc.steam64}" title="Details" aria-label="Details for ${esc(acc.persona_name)}">${icon("sliders")}</button>
+        <button class="key key-primary" data-switch="${acc.steam64}" ${acc.is_active ? "disabled" : ""}>
+          ${acc.is_active ? "Current" : "Switch"}
         </button>
-        <button class="btn btn-ghost" data-open="${acc.steam64}" title="Details">${icon("cog")}</button>
       </div>
     </article>`;
   }).join("");
+  paint(grid);
+
+  const total = S.data.accounts.length;
+  $("#rack-foot").textContent = total
+    ? `${plural(total, "account")}. Press 1 to 9 to switch, drag a row to change the order.`
+    : "";
 }
 
-/* ── drag to reorder ──────────────────────────────────────────────────── */
-/* Dragging a card is what gives the "Custom" sort order something to sort by,
-   so the first drag also flips the sort mode - otherwise the new order would
-   be saved and then immediately overridden by whatever mode was active. */
+// ---- Drag to reorder ----
+// The first drag also sets the sort to Custom, otherwise the saved order would be
+// hidden straight away by the active sort.
 let dragId = null;
 
 $("#grid").addEventListener("dragstart", (e) => {
-  const card = e.target.closest(".card");
-  if (!card) return;
-  dragId = card.dataset.id;
-  card.style.opacity = ".4";
+  const row = e.target.closest(".row");
+  if (!row) return;
+  dragId = row.dataset.id;
+  row.classList.add("is-dragging");
   e.dataTransfer.effectAllowed = "move";
   e.dataTransfer.setData("text/plain", dragId);
 });
@@ -258,35 +257,32 @@ $("#grid").addEventListener("dragstart", (e) => {
 $("#grid").addEventListener("dragover", (e) => {
   if (!dragId) return;
   e.preventDefault();
-  const over = e.target.closest(".card");
-  const dragged = $(`.card[data-id="${dragId}"]`);
+  const over = e.target.closest(".row");
+  const dragged = $(`.row[data-id="${dragId}"]`);
   if (!over || !dragged || over === dragged) return;
-
-  // Insert before or after depending on which half of the card we are over.
   const box = over.getBoundingClientRect();
-  const after = e.clientX > box.left + box.width / 2;
+  const after = e.clientY > box.top + box.height / 2;
   over.parentNode.insertBefore(dragged, after ? over.nextSibling : over);
 });
 
 $("#grid").addEventListener("dragend", async () => {
-  const dragged = $(`.card[data-id="${dragId}"]`);
-  if (dragged) dragged.style.opacity = "";
+  $(`.row[data-id="${dragId}"]`)?.classList.remove("is-dragging");
   if (!dragId) return;
   dragId = null;
 
-  const order = $$("#grid .card").map((c) => c.dataset.id);
+  const order = $$("#grid .row").map((r) => r.dataset.id);
   try {
     await api("/api/reorder", { order });
     if (S.data.settings.sort_mode !== "favorite") {
       await saveSetting("sort_mode", "favorite");
-      toast("Custom order saved — sorting switched to Custom");
+      toast("Order saved, sorting set to Custom");
     } else {
       await refresh();
     }
   } catch (err) { toast(err.message, "err"); }
 });
 
-/* ── render: settings ─────────────────────────────────────────────────── */
+// ---- Render: settings ----
 function renderSettings() {
   const s = S.data.settings;
   $$("[data-setting]").forEach((el) => {
@@ -308,7 +304,7 @@ function renderSettings() {
 const syncSeg = (sel, value) =>
   $$(`${sel} button`).forEach((b) => b.classList.toggle("on", b.dataset.value === value));
 
-/* ── switching ────────────────────────────────────────────────────────── */
+// ---- Switching ----
 async function requestSwitch(steam64, opts = {}) {
   const acc = accountById(steam64);
   if (!acc || acc.is_active) return;
@@ -322,23 +318,27 @@ async function requestSwitch(steam64, opts = {}) {
   await beginSwitch(steam64, opts.app_id);
 }
 
+const LEVEL_LAMP = { danger: "bad", warn: "warn", info: "", ok: "on" };
+
+function issueHtml(item, extra = "") {
+  return `<div class="issue lv-${item.level}"><span class="lamp ${LEVEL_LAMP[item.level] ?? ""}"></span>
+    <div class="issue-body"><b>${esc(item.title)}</b><span>${esc(item.detail)}</span></div>${extra}</div>`;
+}
+
 function confirmSwitch(acc, risks) {
   return new Promise((resolve) => {
-    const checks = risks.map((r) => `
-      <div class="issue lv-${r.level}">${icon("alert")}
-        <div class="issue-body"><b>${esc(r.title)}</b><span>${esc(r.detail)}</span></div>
-      </div>`).join("");
+    const checks = risks.map((r) => issueHtml(r)).join("");
 
     $("#dialog").innerHTML = `
       <h3>Switch to ${esc(acc.persona_name)}?</h3>
-      <p>Steam will close and restart as <code>${esc(acc.account_name)}</code>.
+      <p>Steam closes and starts again as <code>${esc(acc.account_name)}</code>.
       ${acc.has_token
-        ? "It will sign in automatically — no password needed."
-        : "This account has no saved token yet, so Steam will ask for its password once."}</p>
+        ? "It signs in by itself, no password needed."
+        : "This account has no saved token yet, so Steam asks for its password once."}</p>
       ${checks ? `<div class="dialog-checks">${checks}</div>` : ""}
       <div class="dialog-foot">
-        <button class="btn btn-ghost" data-act="cancel">Cancel</button>
-        <button class="btn ${risks.some((r) => r.level === "danger") ? "btn-warn" : ""}" data-act="ok">
+        <button class="key" data-act="cancel">Cancel</button>
+        <button class="key ${risks.some((r) => r.level === "danger") ? "key-warn" : "key-primary"}" data-act="ok">
           ${risks.length ? "Switch anyway" : "Switch"}
         </button>
       </div>`;
@@ -365,13 +365,14 @@ async function beginSwitch(steam64, appId) {
   closeDrawer();
 
   $("#sw-avatar").outerHTML = avatarHtml(acc, "av av-lg").replace("<div ", '<div id="sw-avatar" ');
+  paint($(".switcher"));
   $("#sw-name").textContent = acc.persona_name;
   $("#sw-sub").textContent = `switching to ${acc.account_name}`;
   $("#sw-steps").innerHTML = "";
   $("#sw-close").hidden = true;
   $("#sw-spinner").hidden = false;
   $("#overlay").hidden = false;
-  $(`.card[data-id="${steam64}"]`)?.classList.add("is-switching");
+  $(`.row[data-id="${steam64}"]`)?.classList.add("is-switching");
 
   let job;
   try {
@@ -389,7 +390,7 @@ async function beginSwitch(steam64, appId) {
     } catch { return; }
 
     renderSteps(snap.steps);
-    $("#sw-elapsed").textContent = `${snap.elapsed.toFixed(1)}s`;
+    $("#sw-elapsed").textContent = `${snap.elapsed.toFixed(1)} s`;
     if (snap.state === "done" || snap.state === "error") {
       clearInterval(poll);
       finishSwitch(snap.state === "done");
@@ -397,12 +398,12 @@ async function beginSwitch(steam64, appId) {
   }, 350);
 }
 
+const STEP_CODE = { ok: "[ OK ]", warn: "[WARN]", error: "[FAIL]" };
+
 function renderSteps(steps) {
-  $("#sw-steps").innerHTML = steps.map((s) => {
-    const ic = s.status === "error" ? "x" : s.status === "warn" ? "alert" : "check";
-    return `<li class="step st-${s.status}">
-      <span class="step-icon">${icon(ic)}</span><span>${esc(s.message)}</span></li>`;
-  }).join("");
+  $("#sw-steps").innerHTML = steps.map((s) =>
+    `<li class="step st-${s.status}"><span class="step-code">${STEP_CODE[s.status] || "[ .. ]"}</span><span>${esc(s.message)}</span></li>`
+  ).join("");
   const list = $("#sw-steps");
   list.scrollTop = list.scrollHeight;
 }
@@ -420,7 +421,7 @@ function finishSwitch(ok) {
   }
 }
 
-/* ── drawer ───────────────────────────────────────────────────────────── */
+// ---- Drawer ----
 async function openDrawer(steam64) {
   S.drawerId = steam64;
   $("#drawer").hidden = false;
@@ -445,18 +446,18 @@ function renderDrawer() {
   $("#drawer-inner").innerHTML = `
     <div class="drawer-head">
       ${avatarHtml(acc, "av av-lg")}
-      <div class="card-id">
+      <div class="who-text">
         <b>${esc(acc.persona_name)}</b>
-        <span>${esc(acc.account_name)}</span>
+        <span class="acct">${esc(acc.account_name)}</span>
       </div>
-      <button class="drawer-close" data-act="close" aria-label="Close">${icon("x")}</button>
+      <button class="key key-icon key-quiet" data-act="close" aria-label="Close">${icon("x")}</button>
     </div>
 
-    <div class="card-actions">
-      <button class="btn" data-act="switch" ${acc.is_active ? "disabled" : ""}>
-        ${acc.is_active ? "Current account" : "Switch to this account"}
+    <div class="drawer-actions">
+      <button class="key key-primary" data-act="switch" ${acc.is_active ? "disabled" : ""}>
+        ${acc.is_active ? "Signed in now" : "Switch to this account"}
       </button>
-      <button class="btn btn-ghost" data-act="profile" title="Open Steam profile">${icon("play")}</button>
+      <button class="key" data-act="profile" title="Open the Steam profile">Profile</button>
     </div>
 
     <div class="dsection">
@@ -465,20 +466,20 @@ function renderDrawer() {
       ${idRow("SteamID", acc.ids.steam2)}
       ${idRow("SteamID3", acc.ids.steam3)}
       ${idRow("Account ID", acc.ids.account_id)}
-      ${idRow("Login token", acc.has_token ? "stored — switches instantly" : "none — one sign-in needed")}
+      ${idRow("Login token", acc.has_token ? "saved, switches instantly" : "none, one sign-in needed")}
       ${idRow("Last sign-in", relTime(acc.last_login))}
     </div>
 
     <div class="dsection">
-      <h3>Organise</h3>
+      <h3>Label and note</h3>
       <div class="field-row">
-        <div class="field"><label>Label</label>
-          <input id="d-label" value="${esc(m.label)}" placeholder="Main, Smurf, Trading…" maxlength="24"></div>
-        <div class="field" style="flex:0 0 74px"><label>Colour</label>
-          <input id="d-color" type="color" value="${esc(m.color || "#66c0f4")}" style="padding:3px;height:37px"></div>
+        <div class="field"><label for="d-label">Label</label>
+          <input id="d-label" value="${esc(m.label)}" placeholder="Main, Smurf, Trading" maxlength="24"></div>
+        <div class="field field-color"><label for="d-color">Colour</label>
+          <input id="d-color" type="color" value="${esc(m.color || "#ff6a2b")}"></div>
       </div>
-      <div class="field"><label>Note</label>
-        <textarea id="d-note" placeholder="Anything worth remembering about this account…" maxlength="400">${esc(m.note)}</textarea></div>
+      <div class="field"><label for="d-note">Note</label>
+        <textarea id="d-note" placeholder="Anything worth remembering about this account" maxlength="400">${esc(m.note)}</textarea></div>
     </div>
 
     ${guardOn ? `
@@ -491,50 +492,47 @@ function renderDrawer() {
                  <circle class="bg" cx="17" cy="17" r="14"/>
                  <circle class="fg" id="guard-arc" cx="17" cy="17" r="14" stroke-dasharray="87.96" stroke-dashoffset="0"/>
                </svg>
-               <div><div class="guard-code" id="guard-code">·····</div>
-                 <span style="font-size:11.5px;color:var(--ink-3)" id="guard-left">syncing…</span></div>
-               <button class="btn btn-ghost btn-sm" data-act="guard-copy" style="margin-left:auto">${icon("copy")}</button>
+               <div><div class="guard-code" id="guard-code">-----</div>
+                 <span class="guard-left" id="guard-left">loading</span></div>
+               <button class="key key-sm" data-act="guard-copy" aria-label="Copy the code">${icon("copy")}</button>
              </div>
-             <button class="btn btn-ghost btn-sm" data-act="guard-remove">Remove shared secret</button>`
-          : `<div class="field"><label>Shared secret from your <code>.maFile</code> (Steam Desktop Authenticator)</label>
-               <input id="d-secret" placeholder="base64 shared_secret" spellcheck="false"></div>
-             <button class="btn btn-soft btn-sm" data-act="guard-save">Store secret</button>`}
+             <button class="key key-sm key-quiet" data-act="guard-remove">Remove the shared secret</button>`
+          : `<div class="field"><label for="d-secret">Shared secret from your <code>.maFile</code> (Steam Desktop Authenticator)</label>
+               <input id="d-secret" placeholder="shared_secret, base64" spellcheck="false"></div>
+             <button class="key key-sm" data-act="guard-save">Store the secret</button>`}
       </div>
     </div>` : ""}
 
     ${vaultOn && !acc.has_token ? `
     <div class="dsection">
       <h3>Password</h3>
-      <p style="font-size:12px;color:var(--ink-3);line-height:1.55">
-        Sealed with Windows DPAPI and only ever placed on the clipboard — never passed
-        to Steam on the command line, where any process could read it.</p>
+      <p class="note">Sealed with Windows DPAPI and only ever put on the clipboard. It is never passed
+        to Steam on the command line, where other programs could read it.</p>
       ${acc.vault.password
         ? `<div class="field-row">
-             <button class="btn btn-soft btn-sm" data-act="pw-copy" style="flex:1">${icon("copy")} Copy password</button>
-             <button class="btn btn-ghost btn-sm" data-act="pw-remove">Remove</button>
+             <button class="key key-sm" data-act="pw-copy">${icon("copy")} Copy the password</button>
+             <button class="key key-sm key-quiet" data-act="pw-remove">Remove</button>
            </div>`
-        : `<div class="field"><input id="d-pw" type="password" placeholder="Password for this account" spellcheck="false"></div>
-           <button class="btn btn-soft btn-sm" data-act="pw-save">Store password</button>`}
+        : `<div class="field"><input id="d-pw" type="password" placeholder="Password for this account" spellcheck="false" aria-label="Password"></div>
+           <button class="key key-sm" data-act="pw-save">Store the password</button>`}
     </div>` : ""}
 
     <div class="dsection">
-      <h3>Library</h3>
+      <h3>Games on this PC</h3>
       <div class="games" id="d-games">${S.games[acc.steam64]
-        || `<div class="panel-note">Reading Steam config…</div>`}</div>
+        || `<p class="games-sum">Reading Steam's files</p>`}</div>
     </div>
 
     <div class="dsection">
-      <h3>Danger zone</h3>
-      <button class="btn btn-ghost btn-sm btn-danger" data-act="forget">
-        Forget this account's Switcher data
-      </button>
-      <span style="font-size:11.5px;color:var(--ink-3)">
-        Clears the label, note and any stored secrets. The Steam account itself is untouched.</span>
+      <h3>Remove</h3>
+      <button class="key key-sm key-danger" data-act="forget">Forget this account's Switcher data</button>
+      <span class="danger-note">Clears the label, note and stored secrets. The Steam account is not touched.</span>
     </div>`;
+  paint($("#drawer-inner"));
 }
 
 const idRow = (label, value) =>
-  `<div class="idrow" data-copy="${esc(value)}"><span>${esc(label)}</span><code>${esc(value)}</code>${icon("copy")}</div>`;
+  `<div class="idrow" data-copy="${esc(value)}" title="Copy"><span>${esc(label)}</span><code>${esc(value)}</code>${icon("copy")}</div>`;
 
 async function loadGames(steam64) {
   try {
@@ -542,27 +540,25 @@ async function loadGames(steam64) {
 
     let html;
     if (!data.games.length) {
-      html = `<div class="panel-note">No game activity recorded on this PC for this account.</div>`;
+      html = `<p class="games-sum">No games played on this PC with this account.</p>`;
     } else {
-      const plural = data.suspect_count === 1 ? "entry" : "entries";
-      html = `<div class="panel-note" style="margin:0 0 6px">
-          <b style="color:var(--ink-2)">${data.total}</b> games ·
-          <b style="color:var(--ink-2)">${data.installed_count}</b> installed ·
-          <b style="color:var(--ink-2)">${hours(data.total_minutes)}</b> local playtime
-          ${data.suspect_count ? `<br><span style="color:var(--warn)">${data.suspect_count} ${plural} with an implausible counter excluded from the total</span>` : ""}
-        </div>` + data.games.map((g) => `
+      html = `<p class="games-sum">
+          <b>${data.total}</b> games · <b>${data.installed_count}</b> installed ·
+          <b>${hours(data.total_minutes)}</b> played on this PC
+          ${data.suspect_count ? `<span class="warn">${plural(data.suspect_count, "entry", "entries")} with an impossible play time left out of the total</span>` : ""}
+        </p>` + data.games.map((g) => `
         <div class="game">
           <span class="game-name" title="${esc(g.name)}">${esc(g.name)}</span>
-          ${g.suspect ? `<span class="game-suspect" title="Steam's own local counter for this game is corrupt">${icon("alert")}</span>` : ""}
+          ${g.suspect ? `<span class="game-suspect" title="Steam's local counter for this game is broken">${icon("alert")}</span>` : ""}
           <span class="game-time">${g.minutes ? hours(g.minutes) : relTime(g.last_played)}</span>
           ${g.installed ? `<button class="game-play" data-launch="${g.appid}"
-              title="Switch to this account and launch ${esc(g.name)}">${icon("play")}</button>` : ""}
+              title="Switch to this account and start ${esc(g.name)}" aria-label="Start ${esc(g.name)}">${icon("play")}</button>` : ""}
         </div>`).join("");
     }
 
     S.games[steam64] = html;
     if (S.drawerId === steam64 && $("#d-games")) $("#d-games").innerHTML = html;
-  } catch { /* drawer closed or Steam moved; nothing useful to show */ }
+  } catch { /* drawer closed or Steam moved */ }
 }
 
 function startGuard(steam64) {
@@ -578,36 +574,36 @@ function startGuard(steam64) {
       const code = $("#guard-code");
       if (!code) return;
       code.textContent = g.code;
-      $("#guard-left").textContent = `expires in ${g.remaining}s`;
+      $("#guard-left").textContent = `new code in ${g.remaining} s`;
       const circumference = 2 * Math.PI * 14;
       $("#guard-arc").style.strokeDashoffset = circumference * (1 - g.remaining / g.period);
-    } catch { /* transient */ }
+    } catch { /* try again on the next tick */ }
   };
   tick();
   S.guardTimer = setInterval(tick, 1000);
 }
 
-/* ── history / doctor views ───────────────────────────────────────────── */
+// ---- History and Doctor ----
 async function loadHistory() {
   const { history, stats } = await api("/api/history");
   $("#stat-row").innerHTML = [
     [stats.total_switches, "switches"],
-    [stats.avg_seconds ? `${stats.avg_seconds}s` : "—", "average time"],
-    [stats.fastest_seconds ? `${stats.fastest_seconds}s` : "—", "fastest"],
-    [stats.most_used || "—", "most used"],
+    [stats.avg_seconds ? `${stats.avg_seconds} s` : "-", "average"],
+    [stats.fastest_seconds ? `${stats.fastest_seconds} s` : "-", "fastest"],
+    [stats.most_used || "-", "most used"],
   ].map(([v, l]) => `<div class="stat"><b>${esc(v)}</b><span>${esc(l)}</span></div>`).join("");
 
   $("#timeline").innerHTML = history.length
     ? history.slice(0, 40).map((h) => `
       <div class="tl">
-        <span class="tl-dot ${h.ok ? "" : "bad"}"></span>
+        <span class="lamp ${h.ok ? "on" : "bad"}"></span>
         <div class="tl-body">
           <b>${esc(h.persona || h.account_name || h.steam64)}</b>
-          <span>${h.ok ? `switched in ${h.duration}s` : esc(h.error || "failed")}</span>
+          <span>${h.ok ? `switched in ${h.duration} s` : esc(h.error || "failed")}</span>
         </div>
         <span class="tl-time">${relTime(h.at)}</span>
       </div>`).join("")
-    : `<div class="panel-note">No switches recorded yet.</div>`;
+    : `<p class="panel-note">No switches yet.</p>`;
 
   const { backups } = await api("/api/backups");
   $("#backups").innerHTML = backups.length
@@ -615,30 +611,22 @@ async function loadHistory() {
       <div class="bk">
         <div class="bk-body">
           <b>${esc(b.name)}</b>
-          <span>auto-login was ${esc(b.auto_login_user || "unset")} · ${relTime(b.created)}</span>
+          <span>auto-login was ${esc(b.auto_login_user || "not set")} · ${relTime(b.created)}</span>
         </div>
-        <button class="btn btn-ghost btn-sm" data-restore="${esc(b.name)}">Restore</button>
+        <button class="key key-sm" data-restore="${esc(b.name)}">Restore</button>
       </div>`).join("")
-    : `<div class="panel-note">No restore points yet.</div>`;
+    : `<p class="panel-note">No restore points yet.</p>`;
 }
 
 async function loadDoctor() {
   const { issues } = await api("/api/health");
-  const badge = $("#doctor-badge");
-  badge.hidden = !issues.some((i) => i.level === "danger" || i.level === "warn");
-
-  // An info notice must not get the tick icon - that reads as "all clear".
-  const issueIcon = { danger: "alert", warn: "alert", info: "shield" };
+  $("#doctor-badge").hidden = !issues.some((i) => i.level === "danger" || i.level === "warn");
 
   $("#issues").innerHTML = issues.length
-    ? issues.map((i) => `
-      <div class="issue lv-${i.level}">${icon(issueIcon[i.level] || "check")}
-        <div class="issue-body"><b>${esc(i.title)}</b><span>${esc(i.detail)}</span></div>
-        ${i.fixable ? `<button class="btn btn-sm btn-soft" data-fix="${esc(i.code)}">Fix</button>` : ""}
-      </div>`).join("")
-    : `<div class="issue lv-ok">${icon("check")}
-         <div class="issue-body"><b>Everything looks healthy</b>
-         <span>Steam is where it should be and every account is ready to switch.</span></div></div>`;
+    ? issues.map((i) => issueHtml(i,
+        i.fixable ? `<button class="key key-sm" data-fix="${esc(i.code)}">Fix</button>` : "")).join("")
+    : issueHtml({ level: "ok", title: "Nothing to fix",
+        detail: "Steam is where it should be and every account is ready to switch." });
 }
 
 async function loadLegacy() {
@@ -646,49 +634,49 @@ async function loadLegacy() {
     const data = await api("/api/legacy/scan");
     const note = $("#legacy-note");
     if (!data.found) {
-      note.textContent = "No legacy Steam.bat was found next to this app.";
+      note.textContent = "No Steam.bat found next to this app. If you used a batch switcher before, put it in this folder to bring its accounts over.";
       $("#legacy-list").innerHTML = "";
       return;
     }
     const risky = data.accounts.filter((a) => a.has_password).length;
     note.innerHTML = `Found <code>${esc(data.path.split("\\").pop())}</code> with
-      ${data.accounts.length} account(s).
-      ${risky ? `<b style="color:var(--warn)">${risky} plaintext password(s)</b> are sitting in that file —
-      anyone with a copy of that file can read them.
-      Rotate them at <code>store.steampowered.com/account</code> rather than reusing them.` : ""}`;
+      ${plural(data.accounts.length, "account")}.
+      ${risky ? `<b>${plural(risky, "password")} in plain text</b> in that file. Anyone who has had a copy
+      of it, or of a cloud folder it synced to, can read them: change them at
+      <code>store.steampowered.com/account</code> and delete the file.` : ""}`;
 
     $("#legacy-list").innerHTML = data.accounts.map((a) => `
       <div class="lg">
+        <span class="lamp ${a.matched ? "on" : ""}"></span>
         <div class="lg-body">
           <b>${esc(a.username)}</b>
           <span>${a.matched
             ? `matches ${esc(a.persona_name)}`
             : "not signed in on this PC yet"}${a.password_was_broken
-            ? " · this password contained <code>&amp;</code> or <code>^</code>, which cmd.exe mangled — the old script could never log in with it"
+            ? " · this password has <code>&amp;</code> or <code>^</code> in it, which cmd.exe breaks, so the old script could never sign in with it"
             : ""}</span>
         </div>
-        ${a.matched ? `<span class="pill pill-ok">linked</span>` : `<span class="pill">unknown</span>`}
       </div>`).join("");
   } catch { /* Steam not found; the settings panel already says so */ }
 }
 
-/* ── command palette ──────────────────────────────────────────────────── */
+// ---- Command palette ----
 const PALETTE_ACTIONS = [
-  { id: "view:accounts", label: "Go to Accounts", icon: "users", run: () => setView("accounts") },
-  { id: "view:history", label: "Go to History", icon: "clock", run: () => setView("history") },
-  { id: "view:doctor", label: "Run health check", icon: "stethoscope", run: () => setView("doctor") },
-  { id: "view:settings", label: "Go to Settings", icon: "cog", run: () => setView("settings") },
-  { id: "act:refresh", label: "Refresh Steam state", icon: "refresh", run: refresh },
-  { id: "act:backup", label: "Create a restore point", icon: "shield",
-    run: async () => { const r = await api("/api/backup", {}); toast(`Restore point ${r.name} created`); } },
-  { id: "act:shutdown", label: "Close Steam gracefully", icon: "power",
-    run: async () => { toast("Asking Steam to close…"); const r = await api("/api/steam/shutdown", {});
-      toast(r.forced ? "Steam had to be forced closed" : "Steam closed cleanly", r.forced ? "warn" : "ok"); refresh(); } },
-  { id: "act:launch", label: "Start Steam", icon: "play",
+  { label: "Go to Accounts", icon: "users", run: () => setView("accounts") },
+  { label: "Go to History", icon: "clock", run: () => setView("history") },
+  { label: "Run the health check", icon: "shield", run: () => setView("doctor") },
+  { label: "Go to Settings", icon: "cog", run: () => setView("settings") },
+  { label: "Refresh", icon: "refresh", run: refresh },
+  { label: "Save a restore point", icon: "shield",
+    run: async () => { const r = await api("/api/backup", {}); toast(`Saved restore point ${r.name}`); } },
+  { label: "Close Steam", icon: "power",
+    run: async () => { toast("Asking Steam to close"); const r = await api("/api/steam/shutdown", {});
+      toast(r.forced ? "Steam had to be forced closed" : "Steam closed", r.forced ? "warn" : "ok"); refresh(); } },
+  { label: "Start Steam", icon: "play",
     run: async () => { const r = await api("/api/steam/launch", {}); toast(r.message); } },
-  { id: "act:theme", label: "Toggle light / dark theme", icon: "cog",
+  { label: "Light or dark theme", icon: "sliders",
     run: () => saveSetting("theme", S.data.settings.theme === "light" ? "dark" : "light") },
-  { id: "act:quit", label: "Quit Steam Switcher", icon: "x", run: () => api("/api/quit") },
+  { label: "Quit Steam Switcher", icon: "x", run: () => api("/api/quit") },
 ];
 
 let paletteItems = [];
@@ -706,7 +694,6 @@ const closePalette = () => { $("#palette").hidden = true; };
 function renderPalette(query) {
   const q = query.trim().toLowerCase();
   const accounts = (S.data?.accounts || []).map((a) => ({
-    id: `sw:${a.steam64}`,
     label: `Switch to ${a.persona_name}`,
     hint: a.account_name,
     account: a,
@@ -726,14 +713,15 @@ function renderPalette(query) {
         : `<span class="pitem-icon">${icon(item.icon)}</span>`}
       <b>${esc(item.label)}</b>
       ${item.hint ? `<small>${esc(item.hint)}</small>` : ""}
-    </div>`).join("") || `<div class="panel-note" style="padding:14px">Nothing matches “${esc(query)}”.</div>`;
+    </div>`).join("") || `<div class="palette-empty">Nothing matches "${esc(query)}".</div>`;
+  paint($("#palette-list"));
 }
 
 function movePalette(delta) {
   if (!paletteItems.length) return;
   paletteIndex = (paletteIndex + delta + paletteItems.length) % paletteItems.length;
   $$("#palette-list .pitem").forEach((el, i) => el.classList.toggle("on", i === paletteIndex));
-  $(`#palette-list .pitem.on`)?.scrollIntoView({ block: "nearest" });
+  $("#palette-list .pitem.on")?.scrollIntoView({ block: "nearest" });
 }
 
 function runPalette(index) {
@@ -743,7 +731,7 @@ function runPalette(index) {
   Promise.resolve(item.run()).catch((e) => toast(e.message, "err"));
 }
 
-/* ── settings persistence ─────────────────────────────────────────────── */
+// ---- Settings ----
 async function saveSetting(key, value) {
   try {
     const r = await api("/api/settings", { [key]: value });
@@ -765,8 +753,7 @@ function setView(name) {
   if (name === "settings") loadLegacy();
 }
 
-/* Deep links: #settings opens a view, #account/<steamid> opens that drawer.
-   Handy for pinning a shortcut straight to the panel you want. */
+// #settings opens a view, #account/<steamid64> opens that account's details
 function applyHash() {
   const hash = decodeURIComponent(location.hash.slice(1));
   const [head, arg] = hash.split("/");
@@ -778,7 +765,7 @@ function applyHash() {
   }
 }
 
-/* ── events ───────────────────────────────────────────────────────────── */
+// ---- Events ----
 document.addEventListener("click", async (e) => {
   const t = e.target;
   const hit = (attr) => t.closest(`[${attr}]`)?.getAttribute(attr);
@@ -805,15 +792,15 @@ document.addEventListener("click", async (e) => {
   const copy = hit("data-copy");
   if (copy) {
     await api("/api/clipboard", { text: copy });
-    return toast("Copied to clipboard");
+    return toast("Copied");
   }
 
   const launch = hit("data-launch");
   if (launch) {
-    // No switch needed when this account is already signed in - just run it.
+    // already signed in: just start the game
     if (accountById(S.drawerId)?.is_active) {
       await api("/api/open", { target: `steam://rungameid/${launch}` });
-      return toast("Launching…");
+      return toast("Starting the game");
     }
     return requestSwitch(S.drawerId, { app_id: launch });
   }
@@ -849,7 +836,7 @@ document.addEventListener("click", async (e) => {
   if (t.closest("#btn-clear-history")) { await api("/api/history/clear", {}); return loadHistory(); }
   if (t.closest("#btn-backup")) {
     const r = await api("/api/backup", {});
-    toast(`Restore point ${r.name} created`);
+    toast(`Saved restore point ${r.name}`);
     return loadHistory();
   }
   if (t.closest("#btn-steam-folder")) {
@@ -885,7 +872,7 @@ async function handleDrawerAction(target) {
         const value = $("#d-secret").value.trim();
         if (!value) return;
         await api("/api/vault", { steam64: id, kind: "shared_secret", value });
-        toast("Shared secret sealed with DPAPI");
+        toast("Shared secret stored");
         await refresh(); openDrawer(id);
         return;
       }
@@ -896,13 +883,13 @@ async function handleDrawerAction(target) {
         return;
       case "guard-copy": {
         const r = await api("/api/vault/copy", { steam64: id, kind: "shared_secret" });
-        return toast(`Guard code copied — clipboard clears in ${r.wipes_in}s`);
+        return toast(`Code copied, clipboard clears in ${r.wipes_in} s`);
       }
       case "pw-save": {
         const value = $("#d-pw").value;
         if (!value) return;
         await api("/api/vault", { steam64: id, kind: "password", value });
-        toast("Password sealed with DPAPI");
+        toast("Password stored");
         await refresh(); openDrawer(id);
         return;
       }
@@ -913,7 +900,7 @@ async function handleDrawerAction(target) {
         return;
       case "pw-copy": {
         const r = await api("/api/vault/copy", { steam64: id, kind: "password" });
-        return toast(`Password copied — clipboard clears in ${r.wipes_in}s`);
+        return toast(`Password copied, clipboard clears in ${r.wipes_in} s`);
       }
       case "forget":
         await api("/api/forget", { steam64: id });
@@ -924,7 +911,7 @@ async function handleDrawerAction(target) {
   } catch (err) { toast(err.message, "err"); }
 }
 
-/* Debounced writes so typing a note does not hit the API on every keystroke. */
+// writes are debounced so typing a note does not call the API on every key
 let metaTimer;
 document.addEventListener("input", (e) => {
   const t = e.target;
@@ -957,12 +944,10 @@ document.addEventListener("input", (e) => {
   }
 });
 
-/* ── keyboard ─────────────────────────────────────────────────────────── */
+// ---- Keyboard ----
 document.addEventListener("keydown", (e) => {
   const typing = /^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName);
   const paletteOpen = !$("#palette").hidden;
-
-  if (e.key === "Alt") document.body.classList.add("show-hints");
 
   if (paletteOpen) {
     if (e.key === "Escape") { e.preventDefault(); return closePalette(); }
@@ -980,25 +965,21 @@ document.addEventListener("keydown", (e) => {
     if (typing) return document.activeElement.blur();
   }
 
-  if (typing) return;
+  if (typing || !$("#modal").hidden || !$("#overlay").hidden) return;
 
   if (e.key === "/") { e.preventDefault(); return $("#search").focus(); }
-  if (e.key.toLowerCase() === "r") return refresh();
-  if (e.key >= "1" && e.key <= "9") {
+  if (e.key.toLowerCase() === "r" && !e.ctrlKey) return refresh();
+  if (e.key >= "1" && e.key <= "9" && S.view === "accounts") {
     const acc = visibleAccounts()[Number(e.key) - 1];
     if (acc && !acc.is_active) requestSwitch(acc.steam64);
   }
-});
-
-document.addEventListener("keyup", (e) => {
-  if (e.key === "Alt") document.body.classList.remove("show-hints");
 });
 
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
   if (S.data?.settings.theme === "auto") applyTheme("auto");
 });
 
-/* ── boot ─────────────────────────────────────────────────────────────── */
+// ---- Start ----
 window.addEventListener("hashchange", applyHash);
 
 (async function boot() {

@@ -19,7 +19,7 @@ _lock = threading.RLock()
 
 DEFAULT_SETTINGS: dict[str, Any] = {
     "theme": "dark",                  # dark | light | auto
-    "accent": "steam",                # steam | violet | emerald | amber | rose
+    "accent": "signal",               # signal | steam | violet | emerald | amber | rose
     "steam_path_override": "",
     "confirm_before_switch": True,    # skipped automatically when nothing is at risk
     "close_after_switch": False,

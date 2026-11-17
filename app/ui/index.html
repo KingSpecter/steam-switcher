@@ -1,275 +1,276 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark" data-accent="steam">
+<html lang="en" data-theme="dark" data-accent="signal">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="ss-token" content="__SESSION_TOKEN__">
 <title>Steam Switcher</title>
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
 
-<svg style="display:none" aria-hidden="true">
+<svg class="sprite" aria-hidden="true">
   <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
-  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
-  <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 21C5 15.5 2 12.5 2 8.8 2 6.1 4.1 4 6.8 4c1.7 0 3.3.9 4.2 2.3l1 1.5 1-1.5A5 5 0 0 1 17.2 4C19.9 4 22 6.1 22 8.8c0 3.7-3 6.7-10 12.2Z"/></symbol>
+  <symbol id="i-clock"viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
   <symbol id="i-cog" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1Z"/></symbol>
   <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
   <symbol id="i-power" viewBox="0 0 24 24"><path d="M12 3v9M6.4 6.4a9 9 0 1 0 11.2 0"/></symbol>
   <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1 6.2-5.5-2.9-5.5 2.9 1-6.2L3 9.6l6.2-.9Z"/></symbol>
-  <symbol id="i-play" viewBox="0 0 24 24"><path d="M6 4l14 8-14 8Z"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4l13 8-13 8Z"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path d="m4 12 5 5L20 6"/></symbol>
   <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
-  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="1.5"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></symbol>
   <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4M12 17.5v.5"/></symbol>
   <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8.3-8 9.5C7.5 20.3 4 17 4 12V6Z"/></symbol>
-  <symbol id="i-stethoscope" viewBox="0 0 24 24"><path d="M6 3v6a5 5 0 0 0 10 0V3"/><path d="M6 3H4M16 3h2M11 14v2a5 5 0 0 0 10 0v-2"/><circle cx="21" cy="12" r="2"/></symbol>
   <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></symbol>
-  <symbol id="i-import" viewBox="0 0 24 24"><path d="M12 3v12M8 11l4 4 4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></symbol>
   <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></symbol>
 </svg>
 
 <div id="app">
 
-  <!-- ── left rail ─────────────────────────────────────────────── -->
   <aside class="rail">
     <div class="brand">
-      <div class="brand-mark"><svg><use href="#i-power"/></svg></div>
-      <div class="brand-text"><b>Steam</b><span>Switcher</span></div>
+      <span class="brand-mark"><svg><use href="#i-power"/></svg></span>
+      <span class="brand-text">Steam<br>Switcher</span>
     </div>
 
-    <nav class="nav" id="nav">
-      <button class="nav-item is-active" data-view="accounts"><svg><use href="#i-users"/></svg><span>Accounts</span></button>
-      <button class="nav-item" data-view="history"><svg><use href="#i-clock"/></svg><span>History</span></button>
-      <button class="nav-item" data-view="doctor"><svg><use href="#i-stethoscope"/></svg><span>Doctor</span><i class="nav-badge" id="doctor-badge" hidden></i></button>
-      <button class="nav-item" data-view="settings"><svg><use href="#i-cog"/></svg><span>Settings</span></button>
+    <nav class="nav" id="nav" aria-label="Sections">
+      <button class="nav-item is-active" data-view="accounts">Accounts</button>
+      <button class="nav-item" data-view="history">History</button>
+      <button class="nav-item" data-view="doctor">Doctor<i class="nav-badge" id="doctor-badge" hidden></i></button>
+      <button class="nav-item" data-view="settings">Settings</button>
     </nav>
 
     <div class="rail-foot">
-      <button class="rail-btn" id="btn-palette" title="Command palette (Ctrl+K)"><svg><use href="#i-search"/></svg><span>Ctrl K</span></button>
+      <button class="rail-key" id="btn-palette" title="Command palette">
+        <kbd>Ctrl</kbd><kbd>K</kbd><span>Commands</span>
+      </button>
       <div class="rail-version" id="rail-version"></div>
     </div>
   </aside>
 
-  <!-- ── main ──────────────────────────────────────────────────── -->
   <main class="main">
     <header class="topbar">
-      <div class="now" id="now-playing">
-        <span class="now-dot" id="now-dot"></span>
-        <div class="now-text">
-          <b id="now-name">Loading…</b>
-          <span id="now-sub">reading Steam state</span>
+      <div class="lcd" id="now-playing" role="status" aria-live="polite">
+        <span class="lamp" id="now-dot"></span>
+        <div class="lcd-text">
+          <span class="lcd-tag" id="now-tag">Status</span>
+          <b class="lcd-main" id="now-name">Loading</b>
+          <span class="lcd-sub" id="now-sub">reading Steam state</span>
         </div>
       </div>
 
-      <div class="search">
-        <svg><use href="#i-search"/></svg>
-        <input id="search" type="search" placeholder="Search accounts…  ( / )" autocomplete="off" spellcheck="false">
-      </div>
-
       <div class="topbar-actions">
-        <button class="btn btn-ghost" id="btn-refresh" title="Refresh (R)"><svg><use href="#i-refresh"/></svg></button>
-        <button class="btn btn-ghost" id="btn-steam-folder" title="Open Steam folder"><svg><use href="#i-folder"/></svg></button>
-        <button class="btn btn-ghost btn-danger" id="btn-quit" title="Close Steam Switcher"><svg><use href="#i-x"/></svg></button>
+        <button class="key key-icon" id="btn-refresh" title="Refresh (R)" aria-label="Refresh"><svg><use href="#i-refresh"/></svg></button>
+        <button class="key key-icon" id="btn-steam-folder" title="Open the Steam folder" aria-label="Open the Steam folder"><svg><use href="#i-folder"/></svg></button>
+        <button class="key key-icon key-danger" id="btn-quit" title="Close Steam Switcher" aria-label="Close Steam Switcher"><svg><use href="#i-x"/></svg></button>
       </div>
     </header>
 
     <div class="scroll">
 
-      <!-- ══ ACCOUNTS ══ -->
       <section class="view is-active" id="view-accounts">
         <div id="banners"></div>
-        <div class="grid" id="grid"></div>
-        <div class="empty" id="empty" hidden>
-          <svg><use href="#i-users"/></svg>
-          <h3>No Steam accounts found</h3>
-          <p>Sign in to Steam once and they will appear here automatically.</p>
-        </div>
-      </section>
 
-      <!-- ══ HISTORY ══ -->
-      <section class="view" id="view-history">
-        <div class="stat-row" id="stat-row"></div>
-        <div class="split">
-          <div class="panel">
-            <div class="panel-head">
-              <h2>Switch history</h2>
-              <button class="btn btn-ghost btn-sm" id="btn-clear-history">Clear</button>
-            </div>
-            <div class="timeline" id="timeline"></div>
-          </div>
-          <div class="panel">
-            <div class="panel-head">
-              <h2>Restore points</h2>
-              <button class="btn btn-ghost btn-sm" id="btn-backup">Back up now</button>
-            </div>
-            <p class="panel-note">A snapshot of <code>loginusers.vdf</code> and the auto-login registry keys is taken before every switch.</p>
-            <div class="backups" id="backups"></div>
-          </div>
-        </div>
-      </section>
-
-      <!-- ══ DOCTOR ══ -->
-      <section class="view" id="view-doctor">
-        <div class="panel">
-          <div class="panel-head">
-            <h2>Health check</h2>
-            <button class="btn btn-ghost btn-sm" id="btn-recheck">Re-check</button>
-          </div>
-          <div class="issues" id="issues"></div>
-        </div>
-        <div class="panel">
-          <h2>How switching works</h2>
-          <ol class="explain">
-            <li><b>Graceful shutdown.</b> Steam is asked to close with <code>-shutdown</code> so it finishes Steam Cloud sync and closes downloads cleanly, instead of being force-killed.</li>
-            <li><b>Auto-login is repointed.</b> <code>AutoLoginUser</code> in the registry and the <code>MostRecent</code>/<code>AutoLogin</code> flags in <code>loginusers.vdf</code> are set to the target account.</li>
-            <li><b>Steam restarts</b> and signs in with the refresh token it already stored for that account — no password, no Steam Guard prompt.</li>
-          </ol>
-          <p class="panel-note">Accounts marked <span class="pill pill-warn">Needs password</span> have no stored token yet. Sign in once with <em>Remember me</em> ticked and every switch after that is instant.</p>
-        </div>
-      </section>
-
-      <!-- ══ SETTINGS ══ -->
-      <section class="view" id="view-settings">
-        <div class="panel">
-          <h2>Appearance</h2>
-          <div class="setting">
-            <div><b>Theme</b><span>Follows the app window</span></div>
-            <div class="seg" id="set-theme">
-              <button data-value="dark">Dark</button><button data-value="light">Light</button><button data-value="auto">Auto</button>
-            </div>
-          </div>
-          <div class="setting">
-            <div><b>Accent</b><span>Highlight colour</span></div>
-            <div class="swatches" id="set-accent">
-              <button data-value="steam" style="--sw:#66c0f4"></button>
-              <button data-value="violet" style="--sw:#a78bfa"></button>
-              <button data-value="emerald" style="--sw:#34d399"></button>
-              <button data-value="amber" style="--sw:#fbbf24"></button>
-              <button data-value="rose" style="--sw:#fb7185"></button>
-            </div>
-          </div>
-          <div class="setting">
-            <div><b>Compact cards</b><span>Fit more accounts on screen</span></div>
-            <label class="switch"><input type="checkbox" data-setting="compact_cards"><i></i></label>
-          </div>
-          <div class="setting">
-            <div><b>Sort accounts by</b><span>Favourites always stay on top. Drag a card on the Accounts page to set a custom order.</span></div>
+        <div class="toolbar">
+          <label class="search">
+            <svg><use href="#i-search"/></svg>
+            <input id="search" type="search" placeholder="Find an account" autocomplete="off" spellcheck="false">
+            <kbd>/</kbd>
+          </label>
+          <div class="toolbar-sort">
+            <span class="label">Sort</span>
             <div class="seg" id="set-sort">
               <button data-value="recent">Recent</button><button data-value="name">Name</button><button data-value="switches">Most used</button><button data-value="favorite">Custom</button>
             </div>
           </div>
         </div>
 
+        <div class="rack-head" aria-hidden="true">
+          <span>Key</span><span>Account</span><span>Sign-in</span><span>Last used</span><span></span>
+        </div>
+        <div class="rack" id="grid"></div>
+        <p class="rack-foot" id="rack-foot"></p>
+
+        <div class="empty" id="empty" hidden>
+          <span class="lamp"></span>
+          <h3>No Steam accounts yet</h3>
+          <p>Sign in to Steam once with "Remember me" ticked and the account shows up here.</p>
+        </div>
+      </section>
+
+      <section class="view" id="view-history">
+        <div class="stat-row" id="stat-row"></div>
+        <div class="split">
+          <div class="panel">
+            <div class="panel-head">
+              <h2>Switches</h2>
+              <button class="key key-sm" id="btn-clear-history">Clear</button>
+            </div>
+            <div class="timeline" id="timeline"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head">
+              <h2>Restore points</h2>
+              <button class="key key-sm" id="btn-backup">Save one now</button>
+            </div>
+            <p class="panel-note">Saved before every switch: <code>loginusers.vdf</code> and the auto-login registry values.</p>
+            <div class="backups" id="backups"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="view-doctor">
         <div class="panel">
-          <h2>Switching</h2>
+          <div class="panel-head">
+            <h2>Health check</h2>
+            <button class="key key-sm" id="btn-recheck">Check again</button>
+          </div>
+          <div class="issues" id="issues"></div>
+        </div>
+        <div class="panel">
+          <h2>What a switch does</h2>
+          <ol class="explain">
+            <li><b>Closes Steam properly.</b> It runs <code>steam.exe -shutdown</code> so Steam Cloud finishes syncing and downloads stop at a clean point. Steam is only forced closed if it ignores that.</li>
+            <li><b>Points auto-login at the account.</b> <code>AutoLoginUser</code> in the registry and the <code>MostRecent</code> / <code>AutoLogin</code> flags in <code>loginusers.vdf</code> are set to it.</li>
+            <li><b>Starts Steam again.</b> Steam signs in with the token it saved for that account. No password, no Steam Guard code.</li>
+          </ol>
+          <p class="panel-note">An account marked <span class="state-inline"><span class="lamp warn"></span>Needs password</span> has no saved token yet. Sign in to it once with "Remember me" ticked; after that it switches like the others.</p>
+        </div>
+      </section>
+
+      <section class="view" id="view-settings">
+        <div class="panel">
+          <h2>Look</h2>
           <div class="setting">
-            <div><b>Confirm before switching</b><span>Always ask. A warning is shown regardless when a game is running or a download is active.</span></div>
-            <label class="switch"><input type="checkbox" data-setting="confirm_before_switch"><i></i></label>
+            <div><b>Theme</b><span>Auto follows Windows</span></div>
+            <div class="seg" id="set-theme">
+              <button data-value="dark">Dark</button><button data-value="light">Light</button><button data-value="auto">Auto</button>
+            </div>
           </div>
           <div class="setting">
-            <div><b>Close after switching</b><span>Quit Steam Switcher once Steam restarts</span></div>
-            <label class="switch"><input type="checkbox" data-setting="close_after_switch"><i></i></label>
+            <div><b>Accent</b><span>Colour of the Switch buttons</span></div>
+            <div class="swatches" id="set-accent">
+              <button data-value="signal" title="Signal orange" aria-label="Signal orange"></button>
+              <button data-value="steam" title="Blue" aria-label="Blue"></button>
+              <button data-value="violet" title="Violet" aria-label="Violet"></button>
+              <button data-value="emerald" title="Green" aria-label="Green"></button>
+              <button data-value="amber" title="Amber" aria-label="Amber"></button>
+              <button data-value="rose" title="Rose" aria-label="Rose"></button>
+            </div>
           </div>
           <div class="setting">
-            <div><b>Start Steam minimised</b><span>Launch to the system tray</span></div>
-            <label class="switch"><input type="checkbox" data-setting="launch_silent"><i></i></label>
-          </div>
-          <div class="setting">
-            <div><b>Start in Big Picture</b><span>Launch straight into controller mode</span></div>
-            <label class="switch"><input type="checkbox" data-setting="launch_big_picture"><i></i></label>
-          </div>
-          <div class="setting">
-            <div><b>Shutdown timeout</b><span>How long to wait for Steam to close before forcing it</span></div>
-            <div class="numfield"><input type="number" min="5" max="120" data-setting="shutdown_timeout"><span>s</span></div>
+            <div><b>Compact list</b><span>Smaller rows, no notes</span></div>
+            <label class="switch"><input type="checkbox" data-setting="compact_cards"><i></i></label>
           </div>
         </div>
 
         <div class="panel">
-          <h2>Security</h2>
+          <h2>Switching</h2>
+          <div class="setting">
+            <div><b>Ask before switching</b><span>A warning still shows when a game is running or a download is active</span></div>
+            <label class="switch"><input type="checkbox" data-setting="confirm_before_switch"><i></i></label>
+          </div>
+          <div class="setting">
+            <div><b>Close this app after a switch</b><span>Quits once Steam has restarted</span></div>
+            <label class="switch"><input type="checkbox" data-setting="close_after_switch"><i></i></label>
+          </div>
+          <div class="setting">
+            <div><b>Start Steam minimised</b><span>Steam opens in the system tray</span></div>
+            <label class="switch"><input type="checkbox" data-setting="launch_silent"><i></i></label>
+          </div>
+          <div class="setting">
+            <div><b>Start in Big Picture</b><span>For controller use</span></div>
+            <label class="switch"><input type="checkbox" data-setting="launch_big_picture"><i></i></label>
+          </div>
+          <div class="setting">
+            <div><b>Shutdown timeout</b><span>How long to wait for Steam to close before forcing it</span></div>
+            <div class="numfield"><input type="number" min="5" max="120" data-setting="shutdown_timeout" aria-label="Shutdown timeout in seconds"><span>sec</span></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Passwords and Steam Guard</h2>
           <p class="panel-note">
-            Secrets are sealed with Windows DPAPI and stored in <code id="data-dir">%LOCALAPPDATA%\SteamSwitcher</code> — never in this app's folder, and never anywhere that syncs to the cloud.
-            The switch itself never needs a password.
+            Stored secrets are sealed with Windows DPAPI under your user account and kept in <code id="data-dir">%LOCALAPPDATA%\SteamSwitcher</code>, outside this folder.
+            Switching never needs a password.
           </p>
           <div class="setting">
-            <div><b>Password vault</b><span>Store passwords for accounts that still need a manual sign-in</span></div>
+            <div><b>Password vault</b><span>For accounts that still need one manual sign-in</span></div>
             <label class="switch"><input type="checkbox" data-setting="enable_vault"><i></i></label>
           </div>
           <div class="setting">
-            <div><b>Copy password on switch</b><span>Put it on the clipboard when Steam will ask for it. Wiped automatically after 60s.</span></div>
+            <div><b>Copy the password on switch</b><span>Put on the clipboard when Steam will ask for it, cleared after 60 seconds</span></div>
             <label class="switch"><input type="checkbox" data-setting="auto_copy_password"><i></i></label>
           </div>
           <div class="setting">
-            <div><b>Steam Guard codes</b><span>Generate 2FA codes from a stored shared secret</span></div>
+            <div><b>Steam Guard codes</b><span>Generate codes from a stored shared secret</span></div>
             <label class="switch"><input type="checkbox" data-setting="enable_guard"><i></i></label>
           </div>
         </div>
 
         <div class="panel">
-          <h2>Steam location</h2>
-          <div class="setting">
-            <div><b>Install folder</b><span id="steam-root-now">detecting…</span></div>
+          <h2>Steam folder</h2>
+          <div class="setting setting-wide">
+            <div><b>Install folder</b><span id="steam-root-now">detecting</span></div>
             <div class="pathfield">
-              <input type="text" id="set-steampath" placeholder="Auto-detected from the registry" spellcheck="false">
-              <button class="btn btn-sm" id="btn-savepath">Save</button>
+              <input type="text" id="set-steampath" placeholder="Found automatically" spellcheck="false" aria-label="Steam folder">
+              <button class="key key-sm" id="btn-savepath">Save</button>
             </div>
           </div>
           <div class="setting">
-            <div><b>Libraries</b><span id="libs-now">—</span></div>
+            <div><b>Libraries</b><span id="libs-now">none found</span></div>
           </div>
         </div>
 
-        <div class="panel panel-quiet">
+        <div class="panel">
           <h2>Import from Steam.bat</h2>
-          <p class="panel-note" id="legacy-note">Looking for a legacy switcher script…</p>
+          <p class="panel-note" id="legacy-note">Looking for an old switcher script</p>
           <div id="legacy-list"></div>
         </div>
       </section>
 
-    </div><!-- /scroll -->
+    </div>
   </main>
 
-  <!-- ── detail drawer ─────────────────────────────────────────── -->
   <aside class="drawer" id="drawer" hidden>
     <div class="drawer-inner" id="drawer-inner"></div>
   </aside>
 </div>
 
-<!-- ── switch overlay ──────────────────────────────────────────── -->
 <div class="overlay" id="overlay" hidden>
-  <div class="switcher">
+  <div class="switcher" role="dialog" aria-modal="true" aria-labelledby="sw-name">
     <div class="switcher-head">
       <div class="av av-lg" id="sw-avatar"></div>
       <div>
-        <b id="sw-name">—</b>
-        <span id="sw-sub">Switching…</span>
+        <b id="sw-name">Account</b>
+        <span id="sw-sub">Switching</span>
       </div>
     </div>
-    <ol class="steps" id="sw-steps"></ol>
+    <div class="lcd lcd-log"><ol class="steps" id="sw-steps"></ol></div>
     <div class="switcher-foot">
       <span class="spinner" id="sw-spinner"></span>
-      <span id="sw-elapsed">0.0s</span>
-      <button class="btn" id="sw-close" hidden>Done</button>
+      <span class="mono" id="sw-elapsed">0.0 s</span>
+      <button class="key key-primary" id="sw-close" hidden>Done</button>
     </div>
   </div>
 </div>
 
-<!-- ── command palette ─────────────────────────────────────────── -->
 <div class="palette-wrap" id="palette" hidden>
-  <div class="palette">
-    <input id="palette-input" placeholder="Switch to an account, or type a command…" autocomplete="off" spellcheck="false">
+  <div class="palette" role="dialog" aria-modal="true" aria-label="Commands">
+    <input id="palette-input" placeholder="Switch to an account or run a command" autocomplete="off" spellcheck="false">
     <div class="palette-list" id="palette-list"></div>
-    <div class="palette-foot"><kbd>↑↓</kbd> navigate <kbd>↵</kbd> run <kbd>esc</kbd> close</div>
+    <div class="palette-foot"><kbd>Up</kbd><kbd>Down</kbd> move <kbd>Enter</kbd> run <kbd>Esc</kbd> close</div>
   </div>
 </div>
 
-<!-- ── generic modal ───────────────────────────────────────────── -->
 <div class="overlay" id="modal" hidden>
-  <div class="dialog" id="dialog"></div>
+  <div class="dialog" id="dialog" role="dialog" aria-modal="true"></div>
 </div>
 
-<div class="toasts" id="toasts"></div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
 
-<script>window.__TOKEN__ = "__SESSION_TOKEN__";</script>
 <script src="/app.js"></script>
 </body>
 </html>

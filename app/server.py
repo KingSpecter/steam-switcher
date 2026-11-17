@@ -23,6 +23,9 @@ from typing import Any, Callable
 from . import __version__, clipboard, dpapi, guard, legacy, paths, steam, steamid, store, winproc
 
 COOKIE_NAME = "ss_session"
+# the UI loads only its own files: no inline scripts or styles, nothing from other hosts
+CSP = ("default-src 'self'; img-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; "
+       "object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 
 _routes: dict[tuple[str, str], Callable] = {}
 _dynamic: list[tuple[str, str, Callable]] = []
@@ -420,6 +423,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Content-Security-Policy", CSP)
         for key, value in (extra or {}).items():
             self.send_header(key, value)
         self.end_headers()
